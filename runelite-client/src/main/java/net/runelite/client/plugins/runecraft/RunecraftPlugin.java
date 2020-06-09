@@ -26,6 +26,12 @@ package net.runelite.client.plugins.runecraft;
 
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Provides;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -74,6 +80,7 @@ import static net.runelite.client.plugins.runecraft.AbyssRifts.MIND_RIFT;
 import static net.runelite.client.plugins.runecraft.AbyssRifts.NATURE_RIFT;
 import static net.runelite.client.plugins.runecraft.AbyssRifts.SOUL_RIFT;
 import static net.runelite.client.plugins.runecraft.AbyssRifts.WATER_RIFT;
+import net.runelite.client.task.Schedule;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
@@ -93,6 +100,7 @@ public class RunecraftPlugin extends Plugin
 
 	private static final int DENSE_RUNESTONE_SOUTH_ID = NullObjectID.NULL_10796;
 	private static final int DENSE_RUNESTONE_NORTH_ID = NullObjectID.NULL_8981;
+	private static final Item DENSE_ESSENCE_BLOCK = new Item(ItemID.DENSE_ESSENCE_BLOCK, 1);
 
 	@Getter(AccessLevel.PACKAGE)
 	private final Set<DecorativeObject> abyssObjects = new HashSet<>();
@@ -130,14 +138,24 @@ public class RunecraftPlugin extends Plugin
 	@Inject
 	private AbyssMinimapOverlay abyssMinimapOverlay;
 
+	@Getter(AccessLevel.PACKAGE)
+	private DenseRunecraftingSession session;
+
 	@Inject
 	private DenseRunestoneOverlay denseRunestoneOverlay;
+
+	@Inject
+	private ChippingOverlay chippingOverlay;
 
 	@Inject
 	private RunecraftConfig config;
 
 	@Inject
 	private Notifier notifier;
+
+	private int timeOut;
+	private ArrayList<Item> prevInventory = null;
+	private ArrayList<Item> currInventory = null;
 
 	@Provides
 	RunecraftConfig getConfig(ConfigManager configManager)
@@ -151,7 +169,10 @@ public class RunecraftPlugin extends Plugin
 		overlayManager.add(abyssOverlay);
 		overlayManager.add(abyssMinimapOverlay);
 		overlayManager.add(denseRunestoneOverlay);
+		overlayManager.add(chippingOverlay);
+		session = new DenseRunecraftingSession();
 		updateRifts();
+		timeOut = config.statTimeout();
 	}
 
 	@Override
@@ -160,11 +181,15 @@ public class RunecraftPlugin extends Plugin
 		overlayManager.remove(abyssOverlay);
 		overlayManager.remove(abyssMinimapOverlay);
 		overlayManager.remove(denseRunestoneOverlay);
+		overlayManager.remove(chippingOverlay);
 		abyssObjects.clear();
 		darkMage = null;
 		denseRunestoneNorth = null;
 		denseRunestoneSouth = null;
 		degradedPouchInInventory = false;
+		prevInventory = null;
+		currInventory = null;
+		session = null;
 	}
 
 	@Subscribe
@@ -173,6 +198,7 @@ public class RunecraftPlugin extends Plugin
 		if (event.getGroup().equals("runecraft"))
 		{
 			updateRifts();
+			timeOut = config.statTimeout();
 		}
 	}
 
@@ -239,6 +265,23 @@ public class RunecraftPlugin extends Plugin
 
 		final Item[] items = event.getItemContainer().getItems();
 		degradedPouchInInventory = Stream.of(items).anyMatch(i -> DEGRADED_POUCHES.contains(i.getId()));
+
+		currInventory = new ArrayList <>(Arrays.asList(items));
+
+		// only set the previous inventory if it was originally null
+		prevInventory = prevInventory == null ? new ArrayList <>(Arrays.asList(items)) : prevInventory;
+
+		int prevDenseEssenceCount = Collections.frequency(prevInventory, DENSE_ESSENCE_BLOCK);
+		int currDenseEssenceCount = Collections.frequency(currInventory, DENSE_ESSENCE_BLOCK);
+
+		// if current essence count is more than previous count then we are actively chipping
+		if (currDenseEssenceCount > prevDenseEssenceCount)
+		{
+			session.incrementDenseEsseenceChipped();
+		}
+
+		// set the previous inventory to the what it currently is so it can be compared onItemContainerChanged
+		prevInventory = new ArrayList <>(Arrays.asList(items));
 	}
 
 	@Subscribe
@@ -315,6 +358,33 @@ public class RunecraftPlugin extends Plugin
 		if (config.showWater())
 		{
 			rifts.add(WATER_RIFT);
+		}
+	}
+
+	@Schedule(
+		period = 1,
+		unit = ChronoUnit.SECONDS
+	)
+	public void checkChipping()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+
+		Instant lastDenseEssenceChipped = session.getLastDenseEssenceChipped();
+
+		if (lastDenseEssenceChipped == null)
+		{
+			return;
+		}
+		// reset statst if you haven't chipped anything recently
+		Duration statTimeout = Duration.ofMinutes(timeOut);
+		Duration sinceChipped = Duration.between(lastDenseEssenceChipped, Instant.now());
+
+		if (sinceChipped.compareTo(statTimeout) >= 0)
+		{
+			session.resetRecent();
 		}
 	}
 

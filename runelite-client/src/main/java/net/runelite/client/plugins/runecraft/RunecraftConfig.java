@@ -29,6 +29,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Units;
 
 @ConfigGroup("runecraft")
 public interface RunecraftConfig extends Config
@@ -262,5 +263,28 @@ public interface RunecraftConfig extends Config
 	default boolean showDenseRunestoneClickbox()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "showChippingState",
+		name = "Show current Chip state",
+		description = "Shows current mining state. 'You are currently chipping' / 'You are currently NOT chipping'",
+		position = 22
+	)
+	default boolean showChippingState()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "statTimeout",
+		name = "Reset stats",
+		description = "Configures the time until chipping panel is removed",
+		position = 23
+	)
+	@Units(Units.MINUTES)
+	default int statTimeout()
+	{
+		return 5;
 	}
 }
