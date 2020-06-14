@@ -101,6 +101,8 @@ public class RunecraftPlugin extends Plugin
 	private static final int DENSE_RUNESTONE_SOUTH_ID = NullObjectID.NULL_10796;
 	private static final int DENSE_RUNESTONE_NORTH_ID = NullObjectID.NULL_8981;
 	private static final Item DENSE_ESSENCE_BLOCK = new Item(ItemID.DENSE_ESSENCE_BLOCK, 1);
+	private static final int SOUL_RUNE = ItemID.SOUL_RUNE;
+	private static final int BLOOD_RUNE = ItemID.BLOOD_RUNE;
 
 	@Getter(AccessLevel.PACKAGE)
 	private final Set<DecorativeObject> abyssObjects = new HashSet<>();
@@ -154,15 +156,18 @@ public class RunecraftPlugin extends Plugin
 	private Notifier notifier;
 
 	private int timeOut;
-	private ArrayList<Item> prevInventory = null;
-	private ArrayList<Item> currInventory = null;
+	private Item[] prevInventory = null;
+	private Item[] currInventory = null;
+	private static int prevBloodRuneStack = 0;
+	private static int prevSoulRuneStack = 0;
+	private static int currBloodRuneStack = 0;
+	private static int currSoulRuneStack = 0;
 
 	@Provides
 	RunecraftConfig getConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(RunecraftConfig.class);
 	}
-
 	@Override
 	protected void startUp() throws Exception
 	{
@@ -173,6 +178,10 @@ public class RunecraftPlugin extends Plugin
 		session = new DenseRunecraftingSession();
 		updateRifts();
 		timeOut = config.statTimeout();
+		prevBloodRuneStack = 0;
+		prevSoulRuneStack = 0;
+		currBloodRuneStack = 0;
+		currSoulRuneStack = 0;
 	}
 
 	@Override
@@ -190,6 +199,10 @@ public class RunecraftPlugin extends Plugin
 		prevInventory = null;
 		currInventory = null;
 		session = null;
+		prevBloodRuneStack = 0;
+		prevSoulRuneStack = 0;
+		currBloodRuneStack = 0;
+		currSoulRuneStack = 0;
 	}
 
 	@Subscribe
@@ -266,22 +279,82 @@ public class RunecraftPlugin extends Plugin
 		final Item[] items = event.getItemContainer().getItems();
 		degradedPouchInInventory = Stream.of(items).anyMatch(i -> DEGRADED_POUCHES.contains(i.getId()));
 
-		currInventory = new ArrayList <>(Arrays.asList(items));
+		currInventory = items;
 
-		// only set the previous inventory if it was originally null
-		prevInventory = prevInventory == null ? new ArrayList <>(Arrays.asList(items)) : prevInventory;
+		checkForDenseEssence();
+		checkForRunesCrafted();
 
-		int prevDenseEssenceCount = Collections.frequency(prevInventory, DENSE_ESSENCE_BLOCK);
-		int currDenseEssenceCount = Collections.frequency(currInventory, DENSE_ESSENCE_BLOCK);
+		// set the previous inventory to the what it currently is so it can be compared onItemContainerChanged
+		prevInventory = items;
+	}
+
+	private void checkForDenseEssence()
+	{
+		if (prevInventory == null)
+			return;
+		int prevDenseEssenceCount = Collections.frequency(new ArrayList<>(Arrays.asList(prevInventory)), DENSE_ESSENCE_BLOCK);
+		int currDenseEssenceCount = Collections.frequency(new ArrayList<>(Arrays.asList(currInventory)), DENSE_ESSENCE_BLOCK);
 
 		// if current essence count is more than previous count then we are actively chipping
 		if (currDenseEssenceCount > prevDenseEssenceCount)
 		{
 			session.incrementDenseEsseenceChipped();
 		}
+	}
 
-		// set the previous inventory to the what it currently is so it can be compared onItemContainerChanged
-		prevInventory = new ArrayList <>(Arrays.asList(items));
+	private void checkForRunesCrafted()
+	{
+		boolean preContainedBloodRunes = prevInventory != null && Stream.of(prevInventory).anyMatch(i -> BLOOD_RUNE == i.getId());
+		boolean preContainedSoulRunes = prevInventory != null && Stream.of(prevInventory).anyMatch(i -> SOUL_RUNE == i.getId());
+
+		if (preContainedBloodRunes)
+		{
+			for (Item item: prevInventory)
+			{
+				if (item.getId() == BLOOD_RUNE)
+					prevBloodRuneStack = item.getQuantity();
+			}
+		}
+
+		if (preContainedSoulRunes)
+		{
+			for (Item item: prevInventory)
+			{
+				if (item.getId() == SOUL_RUNE)
+					prevSoulRuneStack = item.getQuantity();
+			}
+		}
+
+		boolean currContainedBloodRunes = Stream.of(currInventory).anyMatch(i -> BLOOD_RUNE == i.getId());
+		boolean currContainedSoulRunes = Stream.of(currInventory).anyMatch(i -> SOUL_RUNE == i.getId());
+
+		if (currContainedBloodRunes)
+		{
+			for (Item item: currInventory)
+			{
+				if (item.getId() == BLOOD_RUNE)
+					currBloodRuneStack = item.getQuantity();
+			}
+		}
+
+		if (currContainedSoulRunes)
+		{
+			for (Item item: currInventory)
+			{
+				if (item.getId() == SOUL_RUNE)
+					currBloodRuneStack = item.getQuantity();
+			}
+		}
+
+		if (prevSoulRuneStack < currSoulRuneStack)
+		{
+			session.runesCreated(SOUL_RUNE, currSoulRuneStack - prevSoulRuneStack);
+		}
+
+		if (prevBloodRuneStack < currBloodRuneStack)
+		{
+			session.runesCreated(BLOOD_RUNE, currBloodRuneStack - prevBloodRuneStack);
+		}
 	}
 
 	@Subscribe

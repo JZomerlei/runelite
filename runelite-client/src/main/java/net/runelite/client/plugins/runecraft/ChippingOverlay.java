@@ -7,6 +7,7 @@ import java.awt.Graphics2D;
 import java.util.Set;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import static net.runelite.api.AnimationID.DENSE_ESSENCE_CHISELING;
 import static net.runelite.api.AnimationID.MINING_3A_PICKAXE;
 import static net.runelite.api.AnimationID.MINING_ADAMANT_PICKAXE;
 import static net.runelite.api.AnimationID.MINING_BLACK_PICKAXE;
@@ -25,6 +26,7 @@ import static net.runelite.api.AnimationID.DENSE_ESSENCE_CHIPPING;
 import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 @Slf4j
@@ -58,24 +60,58 @@ public class ChippingOverlay extends OverlayPanel
 		DenseRunecraftingSession session = plugin.getSession();
 		panelComponent.getChildren().clear();
 
-		if (session.getLastDenseEssenceChipped() != null)
+		if (session.getLastDenseEssenceChipped() != null && config.showChippingState())
 		{
-			if (config.showChippingState())
+			if (DENSE_ESSENCE_CHISELING == client.getLocalPlayer().getAnimation())
 			{
-				if (MINING_ANIMATION_IDS.contains(client.getLocalPlayer().getAnimation()))
-				{
-					panelComponent.getChildren().add(TitleComponent.builder()
-						.text("Chipping")
-						.color(Color.GREEN)
-						.build());
-				}
-				else
-				{
-					panelComponent.getChildren().add(TitleComponent.builder()
-						.text("NOT chipping")
-						.color(Color.RED)
-						.build());
-				}
+
+			}
+
+			if (MINING_ANIMATION_IDS.contains(client.getLocalPlayer().getAnimation()))
+			{
+				panelComponent.getChildren().add(TitleComponent.builder()
+					.text("Chipping")
+					.color(Color.GREEN)
+					.build());
+			}
+			else if (DENSE_ESSENCE_CHISELING == client.getLocalPlayer().getAnimation())
+			{
+				panelComponent.getChildren().add(TitleComponent.builder()
+					.text("Chiseling")
+					.color(Color.GREEN)
+					.build());
+			}
+			else
+			{
+				panelComponent.getChildren().add(TitleComponent.builder()
+					.text("NOT chipping")
+					.color(Color.RED)
+					.build());
+			}
+		}
+
+		if (config.showChippedCount())
+		{
+			if (session.getTotalChipped() > 0)
+			{
+				panelComponent.getChildren().add(LineComponent.builder()
+					.left(String.format("Total chipped: %d", session.getTotalChipped()))
+					.build());
+			}
+		}
+		if (config.showRunesCrafted())
+		{
+			if (session.getBloodRunesCreated() > 0)
+			{
+				panelComponent.getChildren().add(LineComponent.builder()
+					.left(String.format("Blood runes crafted: %d", session.getBloodRunesCreated()))
+					.build());
+			}
+			if (session.getSoulRunesCreated() > 0)
+			{
+				panelComponent.getChildren().add(LineComponent.builder()
+					.left(String.format("Soul runes crafted: %d", session.getSoulRunesCreated()))
+					.build());
 			}
 		}
 		return super.render(graphics);

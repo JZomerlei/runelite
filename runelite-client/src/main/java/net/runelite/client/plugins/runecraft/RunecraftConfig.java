@@ -268,7 +268,7 @@ public interface RunecraftConfig extends Config
 	@ConfigItem(
 		keyName = "showChippingState",
 		name = "Show current Chip state",
-		description = "Shows current mining state. 'You are currently chipping' / 'You are currently NOT chipping'",
+		description = "Shows current chipping state. 'Chipping' / 'NOT chipping'",
 		position = 22
 	)
 	default boolean showChippingState()
@@ -277,10 +277,32 @@ public interface RunecraftConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "showChippedCount",
+		name = "Chipped count",
+		description = "Shows current chipped count in session",
+		position = 23
+	)
+	default boolean showChippedCount()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "showRunesCrafted",
+		name = "Show runes crafted",
+		description = "Shows current runes crafted in session",
+		position = 24
+	)
+	default boolean showRunesCrafted()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "statTimeout",
 		name = "Reset stats",
 		description = "Configures the time until chipping panel is removed",
-		position = 23
+		position = 25
 	)
 	@Units(Units.MINUTES)
 	default int statTimeout()
